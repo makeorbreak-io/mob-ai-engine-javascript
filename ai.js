@@ -252,5 +252,5 @@ const shotRange = (colors, player, origin, direction) => {
     range++;
   } while (true);
 
-  return { [player]: range };
+  return { [player]: Math.max(1, range) };
 };
