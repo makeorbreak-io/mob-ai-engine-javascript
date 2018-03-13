@@ -1,4 +1,4 @@
-const { groupBy, cloneDeep, some, isString} = require("lodash");
+const { compact, flatten, mapValues, groupBy, cloneDeep, some, isString} = require("lodash");
 
 // gameState = shape({
 //   width: number.isRequired,
@@ -14,20 +14,21 @@ const { groupBy, cloneDeep, some, isString} = require("lodash");
 //   finalState: gameState,
 // })
 
+
+module.exports.score = (state) => mapValues(
+  groupBy(compact(flatten(state.colors)), x => x),
+  x => x.length,
+);
+
 module.exports.buildTurnStates = (game, players) => {
-  if(!game || !game.finalState) return [];
+  if (!game || !game.finalState) return [];
 
-  const { colors, player_positions } = game.initialState;
-  const { previous_actions } = game.finalState;
-
-  const turnStates = previous_actions.reduce((turns, actions, turn) => {
-    const nextTurn = applyActions(turns[turn], actions, players);
-    turns.push(nextTurn);
-
-    return turns;
-  }, [{ colors, player_positions }]);
-
-  return turnStates;
+  return game.finalState.previous_actions.reduce(
+    (turns, actions) => turns.concat([
+      module.exports.applyActions(turns[turns.length - 1], actions),
+    ]),
+    [game.initialState],
+  );
 };
 
 module.exports.humanizeAction = (action) => {
@@ -60,11 +61,18 @@ module.exports.humanizeAction = (action) => {
   }
 };
 
-const applyActions = (previousTurn, actions, players) => {
+module.exports.applyActions = (previousTurn, actions) => {
+  const players = Object.keys(previousTurn.player_positions);
   let nextTurn = resolveWalk(previousTurn, actions, players);
   nextTurn = resolveShoot(nextTurn, actions, players);
 
-  return nextTurn;
+  return {
+    ...nextTurn,
+    width: previousTurn.width,
+    height: previousTurn.height,
+    turns_left: previousTurn.turns_left - 1,
+    previous_actions: previousTurn.previous_actions.concat([actions]),
+  };
 };
 
 //----------------------------------------------------------------------------- "walk"
@@ -108,9 +116,10 @@ const resolveWalk = (previousTurn, actions, players) => {
 
   // paint the squares occupied by all the avatars
   const newColors = cloneDeep(colors);
+
   Object.keys(newPositions).map(player => {
     const [ x, y ] = newPositions[player];
-    newColors[y][x] = player;
+    newColors[x][y] = player;
   });
 
   return {
@@ -193,7 +202,7 @@ const resolveShoot = (previousTurn, actions, players) => {
       }
       else {
         // paint the squares of the remaining active shots
-        newColors[playerShot[1]][playerShot[0]] = player;
+        newColors[playerShot[0]][playerShot[1]] = player;
         paintedThisTurn.push(playerShot);
 
         // console.log("paint the squares of the remaining active shots");
@@ -214,7 +223,7 @@ const resolveShoot = (previousTurn, actions, players) => {
 //
 
 const isValidPosition = (colors, [x, y]) => (
-  x >= 0 && y >= 0 && x < colors[0].length && y < colors.length
+  x >= 0 && y >= 0 && x < colors.length && y < colors[0].length
 );
 
 // const isEmptyPosition = (colors, [x, y]) => (
@@ -222,7 +231,7 @@ const isValidPosition = (colors, [x, y]) => (
 // );
 
 const isPlayerPosition = (colors, [x, y], player) => (
-  colors[y][x] === player
+  colors[x][y] === player
 );
 
 const shotRange = (colors, player, origin, direction) => {
