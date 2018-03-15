@@ -147,7 +147,7 @@ const resolveShoot = (previousTurn, actions, players) => {
     };
   }, {});
 
-  const shots = players.reduce((shots, player) => ({
+  const shots = players.filter(player => !actions[player] || actions[player].type === "shoot").reduce((shots, player) => ({
     ...shots,
     [player]: player_positions[player],
   }), {});
